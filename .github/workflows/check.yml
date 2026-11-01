@@ -9,9 +9,6 @@ jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -21,5 +18,49 @@ jobs:
         run: |
           pip install selenium requests
 
-      - name: Run bot script
-        run: python bot.py
+      - name: Create and Run Bot Script
+        run: |
+          cat << 'EOF' > bot.py
+          import time
+          import requests
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.common.by import By
+
+          TELEGRAM_BOT_TOKEN = "9130456398:AAH6OVKEsi2VLnNZ8Evy1milncwb1QyAArc"
+          TELEGRAM_CHAT_ID = "5205838156"
+          CALENDAR_URL = "https://appointment.visafg.com/calendar/8?month=2026-11"
+
+          def send_telegram_alert(message):
+              url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+              payload = {
+                  "chat_id": TELEGRAM_CHAT_ID,
+                  "text": message,
+                  "parse_mode": "Markdown"
+              }
+              try:
+                  requests.post(url, json=payload, timeout=10)
+              except Exception as e:
+                  print(f"[-] خطأ في إرسال التنبيه: {e}")
+
+          def main():
+              options = Options()
+              options.add_argument("--headless")
+              options.add_argument("--no-sandbox")
+              options.add_argument("--disable-dev-shm-usage")
+              
+              driver = webdriver.Chrome(options=options)
+              try:
+                  driver.get(CALENDAR_URL)
+                  time.sleep(6)
+                  body_text = driver.find_element(By.TAG_NAME, "body").text
+                  print("[+] تم فحص الصفحة بنجاح عبر السيرفر السحابي.")
+              except Exception as e:
+                  print(f"[-] حدث خطأ: {e}")
+              finally:
+                  driver.quit()
+
+          if __name__ == "__main__":
+              main()
+          EOF
+          python bot.py
