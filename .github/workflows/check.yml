@@ -3,7 +3,7 @@ name: Visa Appointment Checker
 on:
   schedule:
     - cron: '* * * * *'     # يعمل تلقائياً كل دقيقة
-  workflow_dispatch:        # لتمكين التشغيل اليدوي الفوري متى أردت
+  workflow_dispatch:        # لتمكين التشغيل اليدوي متى أردت
 
 jobs:
   run-bot:
@@ -18,10 +18,11 @@ jobs:
         run: |
           pip install selenium requests
 
-      - name: Check and Send Available Appointments Every Minute
+      - name: Minute Report and Smart Zero-Change Alert
         run: |
           python -c '
           import time
+          import re
           import requests
           from selenium import webdriver
           from selenium.webdriver.chrome.options import Options
@@ -33,15 +34,17 @@ jobs:
 
           def send_telegram_alert(message):
               url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-              payload = {
-                  "chat_id": TELEGRAM_CHAT_ID,
-                  "text": message,
-                  "parse_mode": "Markdown"
-              }
-              try:
-                  requests.post(url, json=payload, timeout=10)
-              except Exception as e:
-                  print(f"[-] خطأ في إرسال التنبيه: {e}")
+              for i in range(0, len(message), 4000):
+                  chunk = message[i:i+4000]
+                  payload = {
+                      "chat_id": TELEGRAM_CHAT_ID,
+                      "text": chunk,
+                      "parse_mode": "Markdown"
+                  }
+                  try:
+                      requests.post(url, json=payload, timeout=10)
+                  except Exception as e:
+                      print(f"[-] خطأ في إرسال التنبيه: {e}")
 
           def main():
               options = Options()
@@ -52,16 +55,28 @@ jobs:
               driver = webdriver.Chrome(options=options)
               try:
                   driver.get(CALENDAR_URL)
-                  time.sleep(8)
+                  time.sleep(10)  # انتظار تحميل عناصر الصفحة بالكامل
                   
-                  # استخراج النص من الصفحة لفحص المواعيد المتاحة
                   body_text = driver.find_element(By.TAG_NAME, "body").text
                   
-                  msg = f"⏱️ *تقرير الفحص (كل دقيقة)*:\n\n📅 الرابط: نوفمبر 2026\n\n📝 *حالة الموقع الحالية*:\n{body_text[:600]}"
-                  send_telegram_alert(msg)
-                  print("[+] تم الفحص وإرسال التقرير بنجاح.")
+                  # استخراج جميع الأرقام من النص للتحقق منها
+                  numbers = [int(n) for n in re.findall(r"\d+", body_text)]
+                  has_non_zero = any(n > 0 for n in numbers)
+                  
+                  # 1. إرسال التقرير الدوري كل دقيقة للتأكد من عمل البوت
+                  report_msg = f"⏱️ *تقرير الفحص الدوري (كل دقيقة)*:\n\n📄 *محتوى الصفحة الحالي*:\n{body_text[:1200]}"
+                  send_telegram_alert(report_msg)
+                  
+                  # 2. إرسال تنبيه هام جداً إذا تغير أي رقم وأصبح أكبر من الصفر
+                  if has_non_zero:
+                      alert_msg = f"🚨 *تنبيه هااام جداً!* 🚨\n\n✨ *تم رصد قيم أكبر من الصفر (احتمال توفر مواعيد جديدة لشهر نوفمبر 2026)!*\n\n🔗 [اضغط هنا لفتح رابط الحجز فوراً]({CALENDAR_URL})"
+                      send_telegram_alert(alert_msg)
+                      print("[+] تم رصد أرقام غير صفرية وإرسال التنبيه الهام!")
+                  else:
+                      print("[-] البوت يعمل: كافة القيم صفر أو لا توجد مواعيد جديدة حالياً.")
+                      
               except Exception as e:
-                  err_msg = f"[-] حدث خطأ أثناء الفحص الدقيق: {e}"
+                  err_msg = f"[-] حدث خطأ أثناء الفحص: {e}"
                   send_telegram_alert(err_msg)
               finally:
                   driver.quit()
