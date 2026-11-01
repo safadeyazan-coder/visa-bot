@@ -3,7 +3,7 @@ name: Visa Appointment Checker
 on:
   schedule:
     - cron: '*/5 * * * *'  # يعمل تلقائياً كل 5 دقائق
-  workflow_dispatch:      # لتمكين التشغيل اليدوي متى أردت
+  workflow_dispatch:      # لتمكين التشغيل اليدوي
 
 jobs:
   run-bot:
@@ -18,9 +18,9 @@ jobs:
         run: |
           pip install selenium requests
 
-      - name: Create and Run Bot Script
+      - name: Run Bot Script Directly
         run: |
-          cat << 'EOF' > bot.py
+          python -c '
           import time
           import requests
           from selenium import webdriver
@@ -53,7 +53,6 @@ jobs:
               try:
                   driver.get(CALENDAR_URL)
                   time.sleep(6)
-                  body_text = driver.find_element(By.TAG_NAME, "body").text
                   print("[+] تم فحص الصفحة بنجاح عبر السيرفر السحابي.")
               except Exception as e:
                   print(f"[-] حدث خطأ: {e}")
@@ -62,5 +61,4 @@ jobs:
 
           if __name__ == "__main__":
               main()
-          EOF
-          python bot.py
+          '
