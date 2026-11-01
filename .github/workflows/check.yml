@@ -2,8 +2,8 @@ name: Visa Appointment Checker
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # يعمل تلقائياً كل 5 دقائق
-  workflow_dispatch:      # لتمكين التشغيل اليدوي
+    - cron: '* * * * *'     # يعمل تلقائياً كل دقيقة
+  workflow_dispatch:        # لتمكين التشغيل اليدوي الفوري متى أردت
 
 jobs:
   run-bot:
@@ -18,7 +18,7 @@ jobs:
         run: |
           pip install selenium requests
 
-      - name: Run Bot Script Directly
+      - name: Check and Send Available Appointments Every Minute
         run: |
           python -c '
           import time
@@ -52,10 +52,17 @@ jobs:
               driver = webdriver.Chrome(options=options)
               try:
                   driver.get(CALENDAR_URL)
-                  time.sleep(6)
-                  print("[+] تم فحص الصفحة بنجاح عبر السيرفر السحابي.")
+                  time.sleep(8)
+                  
+                  # استخراج النص من الصفحة لفحص المواعيد المتاحة
+                  body_text = driver.find_element(By.TAG_NAME, "body").text
+                  
+                  msg = f"⏱️ *تقرير الفحص (كل دقيقة)*:\n\n📅 الرابط: نوفمبر 2026\n\n📝 *حالة الموقع الحالية*:\n{body_text[:600]}"
+                  send_telegram_alert(msg)
+                  print("[+] تم الفحص وإرسال التقرير بنجاح.")
               except Exception as e:
-                  print(f"[-] حدث خطأ: {e}")
+                  err_msg = f"[-] حدث خطأ أثناء الفحص الدقيق: {e}"
+                  send_telegram_alert(err_msg)
               finally:
                   driver.quit()
 
