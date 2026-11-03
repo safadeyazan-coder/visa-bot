@@ -2,8 +2,8 @@ name: Visa Appointment Checker
 
 on:
   schedule:
-    - cron: '* * * * *'     # يعمل تلقائياً كل دقيقة
-  workflow_dispatch:        # لتمكين التشغيل اليدوي متى أردت
+    - cron: '* * * * *'     # يعمل تلقائياً كل دقيقة بصمت تام في الخلفية
+  workflow_dispatch:        # لتمكين التشغيل اليدوي متى أردت الفحص الفوري
 
 jobs:
   run-bot:
@@ -18,7 +18,7 @@ jobs:
         run: |
           pip install selenium requests
 
-      - name: Smart Reserved Number Alert Bot
+      - name: Silent Checker and Smart Alert Bot
         run: |
           python -c '
           import time
@@ -34,17 +34,15 @@ jobs:
 
           def send_telegram_alert(message):
               url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-              for i in range(0, len(message), 4000):
-                  chunk = message[i:i+4000]
-                  payload = {
-                      "chat_id": TELEGRAM_CHAT_ID,
-                      "text": chunk,
-                      "parse_mode": "Markdown"
-                  }
-                  try:
-                      requests.post(url, json=payload, timeout=10)
-                  except Exception as e:
-                      print(f"[-] خطأ في إرسال التنبيه: {e}")
+              payload = {
+                  "chat_id": TELEGRAM_CHAT_ID,
+                  "text": message,
+                  "parse_mode": "Markdown"
+              }
+              try:
+                  requests.post(url, json=payload, timeout=10)
+              except Exception as e:
+                  print(f"[-] خطأ في إرسال التنبيه: {e}")
 
           def main():
               options = Options()
@@ -59,28 +57,23 @@ jobs:
                   
                   body_text = driver.find_element(By.TAG_NAME, "body").text
                   
-                  # البحث الذكي عن كلمة reserved والرقَم المجاور لها حصرياً
+                  # البحث عن الرقم بجانب كلمة reserved
                   match = re.search(r"reserved\D*(\d+)", body_text, re.IGNORECASE)
                   
                   reserved_number = 0
                   if match:
                       reserved_number = int(match.group(1))
                   
-                  # 1. إرسال التقرير الدوري كل دقيقة مع قيمة الـ reserved المرصودة
-                  report_msg = f"⏱️ *تقرير الفحص الدوري (كل دقيقة)*:\n📌 الرقم بجانب Reserved حالياً: *{reserved_number}*\n\n📄 *محتوى الصفحة*:\n{body_text[:800]}"
-                  send_telegram_alert(report_msg)
-                  
-                  # 2. إرسال تنبيه هام جداً إذا كان الرقم بجانب كلمة Reserved أكبر من الصفر
+                  # البوت هنا لا يرسل أي تقارير دورية، فقط يرسل تنبيه إذا تغير الرقم عن الصفر
                   if reserved_number > 0:
-                      alert_msg = f"🚨 *تنبيه هااام جداً!* 🚨\n\n✨ *تم رصد عدد ({reserved_number}) بجانب كلمة Reserved (تغير عن الصفر)!*\n\n🔗 [اضغط هنا لفتح رابط الحجز فوراً]({CALENDAR_URL})"
+                      alert_msg = f"🚨 *تنبيه هااام جداً!* 🚨\n\n✨ *تم رصد مواعيد متاحة أو تغير في الحجز (العدد: {reserved_number}) لشهر نوفمبر 2026!*\n\n🔗 [اضغط هنا لفتح رابط الحجز فوراً]({CALENDAR_URL})"
                       send_telegram_alert(alert_msg)
-                      print(f"[+] تم رصد تغيير في رقم Reserved ({reserved_number}) وإرسال التنبيه الهام!")
+                      print("[+] تم رصد المواعيد وإرسال التنبيه الهام!")
                   else:
-                      print("[-] البوت يعمل: الرقم بجانب Reserved يساوي صفراً حالياً.")
+                      print("[-] البوت يعمل بصمت: لا توجد مواعيد متاحة حالياً.")
                       
               except Exception as e:
-                  err_msg = f"[-] حدث خطأ أثناء الفحص: {e}"
-                  send_telegram_alert(err_msg)
+                  print(f"[-] حدث خطأ أثناء الفحص: {e}")
               finally:
                   driver.quit()
 
